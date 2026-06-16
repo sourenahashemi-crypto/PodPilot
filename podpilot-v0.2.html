@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PodPilot — Studio Recorder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0d;
+    --surface: #141418;
+    --surface-2: #1c1c22;
+    --surface-3: #25252d;
+    --border: #2a2a32;
+    --border-strong: #3a3a44;
+    --text: #f5f5f7;
+    --text-2: #a8a8b0;
+    --text-3: #65656d;
+    --accent: #ff5b3e;
+    --accent-soft: rgba(255, 91, 62, 0.12);
+    --record: #ff3838;
+    --record-glow: rgba(255, 56, 56, 0.4);
+    --good: #4ade80;
+    --warn: #fbbf24;
+    --link: #6ba7ff;
+    --font-display: 'Fraunces', serif;
+    --font-sans: 'Geist', system-ui, sans-serif;
+    --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background:
+      radial-gradient(ellipse at top left, rgba(255, 91, 62, 0.06), transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(120, 80, 255, 0.04), transparent 50%),
+      var(--bg);
+  }
+
+  .app {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .brand { display: flex; align-items: baseline; gap: 12px; }
+
+  .logo {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 28px;
+    letter-spacing: -0.02em;
+    font-variation-settings: "opsz" 144, "SOFT" 50;
+  }
+
+  .logo-dot { color: var(--accent); }
+
+  .tagline {
+    font-size: 12px;
+    color: var(--text-3);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .version {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-3);
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  /* SESSION BAR */
+  .session-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .session-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-3);
+    flex-shrink: 0;
+  }
+
+  .status-dot.live {
+    background: var(--good);
+    box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.15);
+  }
+
+  .status-dot.connecting {
+    background: var(--warn);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .share-area {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .share-url {
+    flex: 1;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--link);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 120ms;
+  }
+
+  .share-url:hover { border-color: var(--border-strong); }
+
+  .participants-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-2);
+    padding: 6px 12px;
+    background: var(--surface-2);
+    border-radius: 999px;
+    font-family: var(--font-mono);
+  }
+
+  .participants-badge svg { width: 12px; height: 12px; }
+
+  .btn {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: border-color 120ms, background 120ms;
+  }
+
+  .btn:hover { background: var(--surface-3); border-color: var(--border-strong); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn svg { width: 13px; height: 13px; }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+
+  .btn-primary:hover { background: #ff7256; border-color: #ff7256; }
+
+  /* MAIN GRID */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 24px;
+  }
+
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; }
+  }
+
+  /* VIDEO GRID */
+  .video-grid {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    display: grid;
+    gap: 8px;
+    aspect-ratio: 16 / 9;
+  }
+
+  .video-grid.count-1 { grid-template-columns: 1fr; }
+  .video-grid.count-2 { grid-template-columns: 1fr 1fr; }
+  .video-grid.count-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+  .video-grid.count-3 .video-tile:first-child { grid-column: 1 / 3; }
+  .video-grid.count-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+
+  .video-tile {
+    position: relative;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .video-tile video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .video-tile.local video {
+    transform: scaleX(-1);
+  }
+
+  .tile-label {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(8px);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .rec-dot-mini {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--record);
+    display: none;
+  }
+
+  .video-tile.recording .rec-dot-mini {
+    display: block;
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--text-3);
+    padding: 20px;
+    height: 100%;
+  }
+
+  .empty-state svg { width: 32px; height: 32px; opacity: 0.4; margin-bottom: 12px; }
+  .empty-state p { font-size: 12px; max-width: 200px; line-height: 1.6; }
+
+  /* STATUS BAR */
+  .status-bar {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 24px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-top: 16px;
+  }
+
+  .timer {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .timer.paused { color: var(--text-3); }
+
+  .meter {
+    height: 6px;
+    background: var(--surface-3);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .meter-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--good) 0%, var(--good) 65%, var(--warn) 85%, var(--record) 100%);
+    width: 0%;
+    transition: width 60ms linear;
+  }
+
+  .db {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-2);
+    min-width: 56px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* CONTROLS */
+  .record-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 24px;
+  }
+
+  .btn-record {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--accent);
+    color: white;
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: 15px;
+    letter-spacing: 0.01em;
+    padding: 14px 32px;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: transform 80ms, background 120ms, box-shadow 120ms;
+  }
+
+  .btn-record:hover:not(:disabled) {
+    background: #ff7256;
+    transform: translateY(-1px);
+  }
+
+  .btn-record:disabled {
+    background: var(--surface-3);
+    color: var(--text-3);
+    cursor: not-allowed;
+  }
+
+  .btn-record.recording {
+    background: var(--record);
+    box-shadow: 0 0 0 6px var(--record-glow);
+  }
+
+  .btn-record .circle {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: white;
+    transition: border-radius 120ms;
+  }
+
+  .btn-record.recording .circle {
+    border-radius: 2px;
+    width: 11px;
+    height: 11px;
+  }
+
+  /* SIDEBAR */
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+
+  .panel-title {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-2);
+    margin-bottom: 12px;
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-variation-settings: "opsz" 14, "SOFT" 50;
+  }
+
+  .panel-title svg { width: 14px; height: 14px; opacity: 0.7; }
+
+  .field { margin-bottom: 10px; }
+  .field:last-child { margin-bottom: 0; }
+
+  label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+  }
+
+  select, input[type="text"] {
+    width: 100%;
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: var(--font-sans);
+    font-size: 13px;
+  }
+
+  select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23a8a8b0' d='M5 6L0 0h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 30px;
+  }
+
+  select:focus, input:focus { outline: none; border-color: var(--accent); }
+
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    font-size: 12px;
+    border-bottom: 1px dashed var(--border);
+  }
+
+  .info-row:last-child { border-bottom: none; }
+  .info-label { color: var(--text-3); }
+  .info-value { color: var(--text); font-family: var(--font-mono); font-size: 11px; }
+
+  /* RECORDINGS */
+  .recordings { margin-top: 32px; }
+  .recordings-title {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    color: var(--text-2);
+    font-variation-settings: "opsz" 18;
+  }
+
+  .recording-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .recording-thumb {
+    width: 56px;
+    height: 56px;
+    background: var(--surface-3);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .recording-thumb video {
+    width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);
+  }
+
+  .recording-name { font-weight: 500; font-size: 14px; margin-bottom: 2px; }
+  .recording-info { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    padding: 12px 18px;
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms;
+  }
+
+  .toast.visible { opacity: 1; pointer-events: auto; }
+  .toast.error { border-color: var(--record); color: #ffb3b3; }
+  .toast.success { border-color: var(--good); color: #b6f5d3; }
+
+  /* MODAL */
+  .modal-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .modal-bg.visible { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 32px;
+    max-width: 480px;
+    width: 90%;
+  }
+
+  .modal h2 {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    font-variation-settings: "opsz" 24;
+  }
+
+  .modal p { color: var(--text-2); margin-bottom: 24px; line-height: 1.6; }
+
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* FOOTER */
+  footer {
+    margin-top: 80px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--text-3);
+    font-size: 12px;
+    line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header>
+    <div class="brand">
+      <div class="logo">PodPilot<span class="logo-dot">.</span></div>
+      <div class="tagline">Multi-person studio</div>
+    </div>
+    <div class="version">v0.2 — peer to peer</div>
+  </header>
+
+  <!-- SESSION BAR -->
+  <div class="session-bar">
+    <div class="session-status">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Not connected</span>
+    </div>
+    <div class="share-area" id="shareArea" style="display: none;">
+      <div class="share-url" id="shareUrl" title="Click to copy">—</div>
+      <button class="btn" id="btnCopy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+        </svg>
+        Copy
+      </button>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <div class="participants-badge" id="participantsBadge" style="display: none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        <span id="participantCount">1</span>
+      </div>
+      <button class="btn btn-primary" id="btnStartSession">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        Start session
+      </button>
+      <button class="btn" id="btnEndSession" style="display: none;">End</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- LEFT: Video grid -->
+    <div>
+      <div class="video-grid count-1" id="videoGrid">
+        <div class="video-tile local" id="localTile">
+          <video id="localVideo" autoplay muted playsinline></video>
+          <div class="empty-state" id="emptyState">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 14v-2m0-8a4 4 0 014 4v4a4 4 0 01-8 0V8a4 4 0 014-4z"/>
+              <path d="M19 11a7 7 0 01-14 0M12 18v3"/>
+            </svg>
+            <p>Pick your camera and mic, then start a session.</p>
+          </div>
+          <div class="tile-label">
+            <span class="rec-dot-mini"></span>
+            <span>You</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-bar">
+        <div class="timer paused" id="timer">00:00:00</div>
+        <div class="meter"><div class="meter-fill" id="meterFill"></div></div>
+        <div class="db" id="dbLabel">— dB</div>
+      </div>
+
+      <div class="record-bar">
+        <button class="btn-record" id="btnRecord" disabled>
+          <span class="circle"></span>
+          <span id="btnLabel">Start recording</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- RIGHT: Settings -->
+    <aside class="sidebar">
+
+      <div class="panel">
+        <div class="panel-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          Devices
+        </div>
+        <div class="field"><label>Your name</label>
+          <input type="text" id="inputName" placeholder="e.g. Sara" maxlength="20">
+        </div>
+        <div class="field"><label>Camera</label><select id="selCamera"></select></div>
+        <div class="field"><label>Microphone</label><select id="selMic"></select></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Quality
+        </div>
+        <div class="field"><label>Resolution & bitrate</label>
+          <select id="selQuality">
+            <option value="4k">4K — 24 Mbps (heavy)</option>
+            <option value="1080" selected>1080p — 8 Mbps</option>
+            <option value="720">720p — 4 Mbps</option>
+          </select>
+        </div>
+        <div class="field"><label>Audio mode</label>
+          <select id="selAudioMode">
+            <option value="studio" selected>Studio — raw, no processing</option>
+            <option value="call">Call — echo cancellation on</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Session info
+        </div>
+        <div class="info-row"><span class="info-label">Resolution</span><span class="info-value" id="iResolution">—</span></div>
+        <div class="info-row"><span class="info-label">Frame rate</span><span class="info-value" id="iFps">—</span></div>
+        <div class="info-row"><span class="info-label">Codec</span><span class="info-value" id="iCodec">—</span></div>
+        <div class="info-row"><span class="info-label">Est. file size</span><span class="info-value" id="iSize">0 MB</span></div>
+      </div>
+    </aside>
+
+  </div>
+
+  <div class="recordings" id="recordingsSection" style="display: none;">
+    <div class="recordings-title">Your recordings</div>
+    <div id="recordingsList"></div>
+  </div>
+
+  <footer>
+    PodPilot v0.2 — multi-person podcast recording, peer-to-peer.<br>
+    Each participant records their own video locally at full quality.
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Welcome modal for joiners -->
+<div class="modal-bg" id="joinModal">
+  <div class="modal">
+    <h2>You've been invited</h2>
+    <p>Someone is starting a podcast session. Pick your camera and mic in the panel, then click below to join.</p>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="btnJoinConfirm">Join session</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// PodPilot v0.2 — Multi-person studio recorder
+// Each peer connects via WebRTC, records locally in full quality
+// ============================================================
+
+const $ = id => document.getElementById(id);
+
+const state = {
+  // Local
+  localStream: null,
+  myName: 'You',
+  myPeerId: null,
+
+  // Recording
+  recorder: null,
+  chunks: [],
+  recording: false,
+  startTime: 0,
+  timerInterval: null,
+  totalBitrate: 8000000,
+
+  // Audio meter
+  audioCtx: null,
+  analyser: null,
+  meterRAF: null,
+
+  // Peers
+  peer: null,
+  isHost: false,
+  roomId: null,
+  calls: {},       // { peerId: MediaConnection }
+  dataConns: {},   // { peerId: DataConnection }
+  peerNames: {},   // { peerId: displayName }
+
+  recordings: [],
+};
+
+// ---------- Toast ----------
+function toast(message, kind = '') {
+  const el = $('toast');
+  el.textContent = message;
+  el.className = 'toast visible' + (kind ? ' ' + kind : '');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove('visible'), 3500);
+}
+
+// ---------- Format helpers ----------
+function fmtTime(ms) {
+  const total = Math.floor(ms / 1000);
+  const h = String(Math.floor(total / 3600)).padStart(2, '0');
+  const m = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+  const s = String(total % 60).padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+
+function fmtBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+}
+
+function shortId(len = 8) {
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let id = '';
+  for (let i = 0; i < len; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  return id;
+}
+
+// ---------- Codec ----------
+function bestMimeType() {
+  const candidates = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=h264,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm',
+    'video/mp4;codecs=h264,aac',
+    'video/mp4',
+  ];
+  for (const t of candidates) {
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) return t;
+  }
+  return '';
+}
+
+function codecLabel(mime) {
+  if (!mime) return '—';
+  const m = mime.match(/codecs=([^;]+)/);
+  if (m) return m[1].replace(/,/g, ' + ').toUpperCase();
+  return mime.split('/')[1].toUpperCase();
+}
+
+// ---------- Devices & stream ----------
+async function loadDevices() {
+  try {
+    const tmp = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    tmp.getTracks().forEach(t => t.stop());
+  } catch (e) {
+    toast('Camera/mic access denied. Allow it in your browser.', 'error');
+    return false;
+  }
+
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const cameras = devices.filter(d => d.kind === 'videoinput');
+  const mics = devices.filter(d => d.kind === 'audioinput');
+
+  const cam = $('selCamera'), mic = $('selMic');
+  cam.innerHTML = '';
+  mic.innerHTML = '';
+
+  cameras.forEach((d, i) => {
+    const o = document.createElement('option');
+    o.value = d.deviceId;
+    o.textContent = d.label || `Camera ${i + 1}`;
+    cam.appendChild(o);
+  });
+  mics.forEach((d, i) => {
+    const o = document.createElement('option');
+    o.value = d.deviceId;
+    o.textContent = d.label || `Microphone ${i + 1}`;
+    mic.appendChild(o);
+  });
+
+  await startStream();
+
+  cam.addEventListener('change', () => restartStream());
+  mic.addEventListener('change', () => restartStream());
+  $('selQuality').addEventListener('change', () => restartStream());
+  $('selAudioMode').addEventListener('change', () => restartStream());
+  $('inputName').addEventListener('input', (e) => {
+    state.myName = e.target.value.trim() || 'You';
+    $('localTile').querySelector('.tile-label span:last-child').textContent = state.myName;
+    broadcastData({ type: 'name', name: state.myName });
+  });
+
+  return true;
+}
+
+async function restartStream() {
+  await startStream();
+  // Replace tracks in existing calls
+  if (state.localStream) {
+    Object.values(state.calls).forEach(call => {
+      const senders = call.peerConnection?.getSenders();
+      if (senders) {
+        senders.forEach(sender => {
+          const track = state.localStream.getTracks().find(t => t.kind === sender.track?.kind);
+          if (track) sender.replaceTrack(track);
+        });
+      }
+    });
+  }
+}
+
+async function startStream() {
+  if (state.localStream) {
+    state.localStream.getTracks().forEach(t => t.stop());
+    state.localStream = null;
+  }
+  stopMeter();
+
+  const quality = $('selQuality').value;
+  const audioMode = $('selAudioMode').value;
+  const cameraId = $('selCamera').value;
+  const micId = $('selMic').value;
+
+  const qmap = {
+    '4k':   { width: 3840, height: 2160, bitrate: 24000000 },
+    '1080': { width: 1920, height: 1080, bitrate: 8000000 },
+    '720':  { width: 1280, height: 720,  bitrate: 4000000 },
+  };
+  const q = qmap[quality];
+  state.totalBitrate = q.bitrate + 192000;
+
+  try {
+    state.localStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        deviceId: cameraId ? { exact: cameraId } : undefined,
+        width: { ideal: q.width },
+        height: { ideal: q.height },
+        frameRate: { ideal: 30 },
+      },
+      audio: {
+        deviceId: micId ? { exact: micId } : undefined,
+        echoCancellation: audioMode === 'call',
+        noiseSuppression: audioMode === 'call',
+        autoGainControl: audioMode === 'call',
+        sampleRate: 48000,
+        channelCount: 2,
+      },
+    });
+  } catch (e) {
+    toast('Stream error: ' + (e.message || e.name), 'error');
+    return;
+  }
+
+  $('localVideo').srcObject = state.localStream;
+  $('emptyState').style.display = 'none';
+
+  const vt = state.localStream.getVideoTracks()[0];
+  if (vt) {
+    const s = vt.getSettings();
+    $('iResolution').textContent = `${s.width || '?'}×${s.height || '?'}`;
+    $('iFps').textContent = (s.frameRate ? Math.round(s.frameRate) : '?') + ' fps';
+  }
+  $('iCodec').textContent = codecLabel(bestMimeType());
+
+  startMeter();
+  $('btnRecord').disabled = false;
+}
+
+// ---------- Audio meter ----------
+function startMeter() {
+  try {
+    if (!state.audioCtx) state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (state.audioCtx.state === 'suspended') state.audioCtx.resume();
+    const source = state.audioCtx.createMediaStreamSource(state.localStream);
+    state.analyser = state.audioCtx.createAnalyser();
+    state.analyser.fftSize = 1024;
+    state.analyser.smoothingTimeConstant = 0.6;
+    source.connect(state.analyser);
+
+    const data = new Uint8Array(state.analyser.frequencyBinCount);
+    const fill = $('meterFill');
+    const dbLabel = $('dbLabel');
+
+    const tick = () => {
+      state.analyser.getByteFrequencyData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+      const rms = Math.sqrt(sum / data.length) / 255;
+      fill.style.width = Math.min(100, Math.round(rms * 180)) + '%';
+      const db = rms > 0.001 ? Math.round(20 * Math.log10(rms)) : -60;
+      dbLabel.textContent = (db <= -60 ? '—' : db) + ' dB';
+      state.meterRAF = requestAnimationFrame(tick);
+    };
+    tick();
+  } catch (e) { console.warn('Meter error', e); }
+}
+
+function stopMeter() {
+  if (state.meterRAF) cancelAnimationFrame(state.meterRAF);
+  $('meterFill').style.width = '0%';
+  $('dbLabel').textContent = '— dB';
+}
+
+// ============================================================
+// PEER CONNECTION (PeerJS)
+// ============================================================
+
+function setStatus(text, kind = '') {
+  $('statusText').textContent = text;
+  const dot = $('statusDot');
+  dot.classList.remove('live', 'connecting');
+  if (kind) dot.classList.add(kind);
+}
+
+function updateParticipantsBadge() {
+  const count = 1 + Object.keys(state.calls).length;
+  $('participantCount').textContent = count;
+  $('participantsBadge').style.display = state.roomId ? 'flex' : 'none';
+}
+
+function initPeer(customId) {
+  return new Promise((resolve, reject) => {
+    state.peer = new Peer(customId, { debug: 1 });
+
+    state.peer.on('open', (id) => {
+      state.myPeerId = id;
+      resolve(id);
+    });
+
+    state.peer.on('error', (err) => {
+      console.error('Peer error:', err);
+      if (err.type === 'unavailable-id') {
+        toast('Room ID already in use. Try ending and creating a new session.', 'error');
+      } else if (err.type === 'peer-unavailable') {
+        toast('That room is not active. The host may have left.', 'error');
+        setStatus('Room unavailable');
+      } else {
+        toast('Connection error: ' + err.type, 'error');
+      }
+      reject(err);
+    });
+
+    state.peer.on('call', handleIncomingCall);
+    state.peer.on('connection', handleIncomingData);
+  });
+}
+
+function handleIncomingCall(call) {
+  if (!state.localStream) {
+    call.close();
+    return;
+  }
+  call.answer(state.localStream);
+  state.calls[call.peer] = call;
+
+  call.on('stream', (remoteStream) => {
+    addRemoteTile(call.peer, remoteStream);
+  });
+
+  call.on('close', () => {
+    removePeer(call.peer);
+  });
+
+  call.on('error', (e) => console.warn('Call error', call.peer, e));
+
+  updateParticipantsBadge();
+}
+
+function handleIncomingData(conn) {
+  state.dataConns[conn.peer] = conn;
+
+  conn.on('open', () => {
+    // Send our name
+    conn.send({ type: 'name', name: state.myName });
+
+    // If we're the host and there are other peers already, tell new peer about them
+    if (state.isHost) {
+      const others = Object.keys(state.calls).filter(p => p !== conn.peer);
+      if (others.length > 0) {
+        conn.send({ type: 'existing-peers', peers: others });
+      }
+    }
+  });
+
+  conn.on('data', (data) => handleDataMessage(conn.peer, data));
+
+  conn.on('close', () => {
+    delete state.dataConns[conn.peer];
+  });
+}
+
+function handleDataMessage(fromPeer, data) {
+  if (data.type === 'name') {
+    state.peerNames[fromPeer] = data.name;
+    const tile = document.querySelector(`[data-peer="${fromPeer}"]`);
+    if (tile) tile.querySelector('.tile-label span:last-child').textContent = data.name;
+  } else if (data.type === 'existing-peers') {
+    // Host is telling us about other peers we need to connect to
+    data.peers.forEach(p => {
+      if (!state.calls[p] && p !== state.myPeerId) {
+        callPeer(p);
+      }
+    });
+  } else if (data.type === 'start-recording') {
+    if (!state.recording) startRecording(false);
+  } else if (data.type === 'stop-recording') {
+    if (state.recording) stopRecording(false);
+  }
+}
+
+function callPeer(peerId) {
+  if (!state.localStream || state.calls[peerId]) return;
+
+  const call = state.peer.call(peerId, state.localStream);
+  state.calls[peerId] = call;
+
+  call.on('stream', (remoteStream) => {
+    addRemoteTile(peerId, remoteStream);
+  });
+
+  call.on('close', () => {
+    removePeer(peerId);
+  });
+
+  call.on('error', (e) => console.warn('Call error', peerId, e));
+
+  // Also open a data connection
+  if (!state.dataConns[peerId]) {
+    const conn = state.peer.connect(peerId);
+    state.dataConns[peerId] = conn;
+
+    conn.on('open', () => {
+      conn.send({ type: 'name', name: state.myName });
+    });
+    conn.on('data', (data) => handleDataMessage(peerId, data));
+    conn.on('close', () => { delete state.dataConns[peerId]; });
+  }
+
+  updateParticipantsBadge();
+}
+
+function broadcastData(message) {
+  Object.values(state.dataConns).forEach(conn => {
+    if (conn.open) {
+      try { conn.send(message); } catch(e) {}
+    }
+  });
+}
+
+// ---------- UI for tiles ----------
+function addRemoteTile(peerId, stream) {
+  let tile = document.querySelector(`[data-peer="${peerId}"]`);
+  if (!tile) {
+    tile = document.createElement('div');
+    tile.className = 'video-tile remote';
+    tile.dataset.peer = peerId;
+    tile.innerHTML = `
+      <video autoplay playsinline></video>
+      <div class="tile-label">
+        <span class="rec-dot-mini"></span>
+        <span>${state.peerNames[peerId] || 'Guest'}</span>
+      </div>
+    `;
+    $('videoGrid').appendChild(tile);
+  }
+  tile.querySelector('video').srcObject = stream;
+  updateGridLayout();
+}
+
+function removePeer(peerId) {
+  const tile = document.querySelector(`[data-peer="${peerId}"]`);
+  if (tile) tile.remove();
+  delete state.calls[peerId];
+  delete state.dataConns[peerId];
+  delete state.peerNames[peerId];
+  updateGridLayout();
+  updateParticipantsBadge();
+}
+
+function updateGridLayout() {
+  const count = 1 + Object.keys(state.calls).length;
+  const grid = $('videoGrid');
+  grid.className = 'video-grid count-' + Math.min(4, count);
+}
+
+// ---------- Session lifecycle ----------
+async function startSession() {
+  if (!state.localStream) {
+    toast('Set up your camera first.', 'error');
+    return;
+  }
+
+  const roomId = 'pp-' + shortId(8);
+  setStatus('Creating session…', 'connecting');
+
+  try {
+    await initPeer(roomId);
+  } catch (e) { return; }
+
+  state.isHost = true;
+  state.roomId = roomId;
+
+  const url = `${window.location.origin}${window.location.pathname}#room=${roomId}`;
+  $('shareUrl').textContent = url;
+  $('shareArea').style.display = 'flex';
+  $('btnStartSession').style.display = 'none';
+  $('btnEndSession').style.display = 'inline-flex';
+
+  setStatus(`Live · waiting for others`, 'live');
+  updateParticipantsBadge();
+  toast('Session started. Share the link!', 'success');
+}
+
+async function joinSession(roomId) {
+  setStatus('Joining session…', 'connecting');
+
+  // Wait until local stream is ready
+  if (!state.localStream) {
+    const ok = await loadDevices();
+    if (!ok) return;
+  }
+
+  try {
+    await initPeer(undefined);
+  } catch (e) { return; }
+
+  state.isHost = false;
+  state.roomId = roomId;
+
+  // Call the host
+  callPeer(roomId);
+
+  $('btnStartSession').style.display = 'none';
+  $('btnEndSession').style.display = 'inline-flex';
+
+  setStatus('Live · connected', 'live');
+  updateParticipantsBadge();
+  $('joinModal').classList.remove('visible');
+}
+
+function endSession() {
+  if (state.recording) stopRecording(true);
+
+  Object.values(state.calls).forEach(c => { try { c.close(); } catch(e) {} });
+  Object.values(state.dataConns).forEach(c => { try { c.close(); } catch(e) {} });
+  if (state.peer) { try { state.peer.destroy(); } catch(e) {} }
+
+  state.calls = {};
+  state.dataConns = {};
+  state.peerNames = {};
+  state.peer = null;
+  state.isHost = false;
+  state.roomId = null;
+
+  document.querySelectorAll('.video-tile.remote').forEach(t => t.remove());
+  updateGridLayout();
+
+  $('shareArea').style.display = 'none';
+  $('participantsBadge').style.display = 'none';
+  $('btnStartSession').style.display = 'inline-flex';
+  $('btnEndSession').style.display = 'none';
+  setStatus('Not connected');
+
+  // Remove hash from URL
+  if (window.location.hash) {
+    history.replaceState(null, '', window.location.pathname);
+  }
+
+  toast('Session ended');
+}
+
+// ---------- Recording ----------
+function startRecording(broadcast = true) {
+  if (state.recording || !state.localStream) return;
+
+  const mimeType = bestMimeType();
+  if (!mimeType) {
+    toast('MediaRecorder unsupported. Try Chrome or Edge.', 'error');
+    return;
+  }
+
+  const qmap = { '4k': 24000000, '1080': 8000000, '720': 4000000 };
+  const videoBits = qmap[$('selQuality').value];
+
+  state.chunks = [];
+  state.recorder = new MediaRecorder(state.localStream, {
+    mimeType,
+    videoBitsPerSecond: videoBits,
+    audioBitsPerSecond: 192000,
+  });
+
+  state.recorder.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) state.chunks.push(e.data);
+  };
+
+  state.recorder.onstop = () => {
+    const blob = new Blob(state.chunks, { type: mimeType });
+    addRecording(blob, mimeType);
+  };
+
+  state.recorder.onerror = (e) => {
+    toast('Recording error', 'error');
+    stopRecording(broadcast);
+  };
+
+  state.recorder.start(1000);
+  state.recording = true;
+  state.startTime = Date.now();
+  $('btnRecord').classList.add('recording');
+  $('btnLabel').textContent = 'Stop recording';
+  $('localTile').classList.add('recording');
+  $('timer').classList.remove('paused');
+
+  state.timerInterval = setInterval(() => {
+    const elapsed = Date.now() - state.startTime;
+    $('timer').textContent = fmtTime(elapsed);
+    const estBytes = (state.totalBitrate / 8) * (elapsed / 1000);
+    $('iSize').textContent = fmtBytes(estBytes);
+  }, 250);
+
+  if (broadcast) {
+    broadcastData({ type: 'start-recording' });
+    toast('Recording started · everyone is recording locally', 'success');
+  } else {
+    toast('Recording started by another participant', 'success');
+  }
+}
+
+function stopRecording(broadcast = true) {
+  if (!state.recording) return;
+  try { state.recorder.stop(); } catch(e) {}
+  state.recording = false;
+  clearInterval(state.timerInterval);
+  $('btnRecord').classList.remove('recording');
+  $('btnLabel').textContent = 'Start recording';
+  $('localTile').classList.remove('recording');
+  $('timer').classList.add('paused');
+  $('timer').textContent = '00:00:00';
+
+  if (broadcast) {
+    broadcastData({ type: 'stop-recording' });
+  }
+}
+
+function addRecording(blob, mime) {
+  const idx = state.recordings.length + 1;
+  const now = new Date();
+  const stamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 16);
+  const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+  const safeName = (state.myName || 'me').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  const filename = `podpilot_${safeName}_${stamp}.${ext}`;
+
+  const url = URL.createObjectURL(blob);
+  const duration = Date.now() - state.startTime;
+  state.recordings.push({ url, filename, blob, size: blob.size, duration, mime });
+
+  $('recordingsSection').style.display = 'block';
+
+  const card = document.createElement('div');
+  card.className = 'recording-card';
+
+  const thumb = document.createElement('div');
+  thumb.className = 'recording-thumb';
+  const tv = document.createElement('video');
+  tv.src = url; tv.muted = true; tv.playsInline = true; tv.preload = 'metadata';
+  tv.addEventListener('loadedmetadata', () => { tv.currentTime = 0.5; });
+  thumb.appendChild(tv);
+
+  const meta = document.createElement('div');
+  meta.innerHTML = `
+    <div class="recording-name">Recording #${idx} — ${state.myName}</div>
+    <div class="recording-info">${fmtTime(duration)} · ${fmtBytes(blob.size)} · ${codecLabel(mime)}</div>
+  `;
+
+  const dl = document.createElement('a');
+  dl.className = 'btn';
+  dl.href = url;
+  dl.download = filename;
+  dl.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+    Download
+  `;
+
+  card.appendChild(thumb);
+  card.appendChild(meta);
+  card.appendChild(dl);
+  $('recordingsList').prepend(card);
+}
+
+// ---------- Wire up ----------
+$('btnRecord').addEventListener('click', () => {
+  if (state.recording) stopRecording(true);
+  else startRecording(true);
+});
+
+$('btnStartSession').addEventListener('click', startSession);
+$('btnEndSession').addEventListener('click', endSession);
+
+$('btnCopy').addEventListener('click', () => {
+  const url = $('shareUrl').textContent;
+  navigator.clipboard.writeText(url).then(() => {
+    toast('Link copied! Share it with your guest.', 'success');
+  });
+});
+
+$('shareUrl').addEventListener('click', () => {
+  $('btnCopy').click();
+});
+
+$('btnJoinConfirm').addEventListener('click', () => {
+  const hash = window.location.hash;
+  const match = hash.match(/room=([a-z0-9-]+)/i);
+  if (match) joinSession(match[1]);
+});
+
+window.addEventListener('beforeunload', (e) => {
+  if (state.recording || state.recordings.length > 0 || Object.keys(state.calls).length > 0) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+// ---------- Boot ----------
+async function boot() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast('Browser unsupported. Use Chrome, Edge or Firefox.', 'error');
+    return;
+  }
+  if (typeof MediaRecorder === 'undefined') {
+    toast('MediaRecorder unsupported.', 'error');
+    return;
+  }
+  if (typeof Peer === 'undefined') {
+    toast('PeerJS failed to load. Check your internet.', 'error');
+    return;
+  }
+
+  await loadDevices();
+
+  // Check URL for room join
+  const hash = window.location.hash;
+  const match = hash.match(/room=([a-z0-9-]+)/i);
+  if (match) {
+    setStatus('Invited to a session');
+    $('joinModal').classList.add('visible');
+  } else {
+    setStatus('Ready');
+  }
+}
+
+boot();
+</script>
+
+</body>
+</html>
